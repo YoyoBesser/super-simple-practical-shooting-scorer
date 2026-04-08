@@ -1,4 +1,5 @@
-import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native'
+import { useState } from 'react'
+import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useStore } from '../store/useStore'
 import type { Stage } from '../store/types'
@@ -8,17 +9,7 @@ export default function HomeScreen() {
   const router = useRouter()
   const stages = useStore((s) => s.stages)
   const deleteStage = useStore((s) => s.deleteStage)
-
-  function confirmDelete(stage: Stage) {
-    Alert.alert(
-      'Delete Stage',
-      `Delete "${stage.name}"? This removes all scores.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteStage(stage.id) },
-      ]
-    )
-  }
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   return (
     <View style={s.container}>
@@ -29,21 +20,42 @@ export default function HomeScreen() {
         ListEmptyComponent={
           <Text style={s.empty}>No stages yet.{'\n'}Tap + to create one.</Text>
         }
-        renderItem={({ item }: { item: Stage }) => (
-          <Pressable
-            style={({ pressed }: { pressed: boolean }) => [s.row, pressed && s.pressed]}
-            onPress={() => router.push(`/stage/${item.id}`)}
-            onLongPress={() => confirmDelete(item)}
-          >
-            <View>
-              <Text style={s.stageName}>{item.name}</Text>
-              <Text style={s.stageSub}>
-                {item.numTargets} target{item.numTargets !== 1 ? 's' : ''} · {item.scores.length} score{item.scores.length !== 1 ? 's' : ''}
-              </Text>
+        renderItem={({ item }: { item: Stage }) =>
+          confirmingId === item.id ? (
+            <View style={s.confirmRow}>
+              <Text style={s.confirmText}>Delete "{item.name}"?</Text>
+              <View style={s.confirmBtns}>
+                <Pressable style={s.confirmNo} onPress={() => setConfirmingId(null)}>
+                  <Text style={s.confirmNoText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={s.confirmYes}
+                  onPress={() => { deleteStage(item.id); setConfirmingId(null) }}
+                >
+                  <Text style={s.confirmYesText}>Delete</Text>
+                </Pressable>
+              </View>
             </View>
-            <Text style={s.arrow}>›</Text>
-          </Pressable>
-        )}
+          ) : (
+            <View style={s.row}>
+              <Pressable
+                style={({ pressed }: { pressed: boolean }) => [s.rowMain, pressed && s.pressed]}
+                onPress={() => router.push(`/stage/${item.id}`)}
+              >
+                <View>
+                  <Text style={s.stageName}>{item.name}</Text>
+                  <Text style={s.stageSub}>
+                    {item.numTargets} target{item.numTargets !== 1 ? 's' : ''} · {item.scores.length} score{item.scores.length !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+                <Text style={s.arrow}>›</Text>
+              </Pressable>
+              <Pressable style={s.deleteBtn} onPress={() => setConfirmingId(item.id)}>
+                <Text style={s.deleteBtnText}>✕</Text>
+              </Pressable>
+            </View>
+          )
+        }
       />
       <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
         <Pressable style={s.fab} onPress={() => router.push('/stage/new')}>
@@ -62,9 +74,16 @@ const s = StyleSheet.create({
   list: { padding: 16, gap: 10 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: { color: '#666', fontSize: 18, textAlign: 'center', lineHeight: 30 },
+
   row: {
     backgroundColor: '#2a2a2a',
     borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    overflow: 'hidden',
+  },
+  rowMain: {
+    flex: 1,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -74,6 +93,39 @@ const s = StyleSheet.create({
   stageName: { color: '#fff', fontSize: 18, fontWeight: '600' },
   stageSub: { color: '#888', fontSize: 13, marginTop: 3 },
   arrow: { color: '#555', fontSize: 24 },
+  deleteBtn: {
+    backgroundColor: '#3a1a1a',
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteBtnText: { color: '#e63946', fontSize: 18 },
+
+  confirmRow: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 10,
+    padding: 14,
+    gap: 10,
+  },
+  confirmText: { color: '#fff', fontSize: 15 },
+  confirmBtns: { flexDirection: 'row', gap: 10 },
+  confirmNo: {
+    flex: 1,
+    backgroundColor: '#3a3a3a',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  confirmNoText: { color: '#aaa', fontSize: 15, fontWeight: '600' },
+  confirmYes: {
+    flex: 1,
+    backgroundColor: '#e63946',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  confirmYesText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
   fab: {
     position: 'absolute',
     bottom: 30,
