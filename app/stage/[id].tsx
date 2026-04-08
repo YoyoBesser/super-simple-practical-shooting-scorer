@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, Pressable, StyleSheet,
-  KeyboardAvoidingView, Platform, FlatList,
+  KeyboardAvoidingView, Platform, SectionList,
 } from 'react-native'
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
 import { useStore } from '../../store/useStore'
-import { computeHitFactor, computePoints, getShotsForTarget, totalExpectedShots, type Hits, type ShooterScore } from '../../store/types'
+import {
+  computeHitFactor, computePoints, getShotsForTarget, totalExpectedShots,
+  type Hits, type ShooterScore, type Category, CATEGORIES,
+} from '../../store/types'
 
 type HitKey = keyof Hits
 
@@ -51,6 +54,7 @@ export default function StageScreen() {
   const [shooterName, setShooterName] = useState('')
   const [time, setTime] = useState('')
   const [sequence, setSequence] = useState<HitKey[]>([])
+  const [category, setCategory] = useState<Category>('Production')
   const [editingScoreId, setEditingScoreId] = useState<string | null>(null)
   const timeRef = useRef<TextInput>(null)
 
@@ -91,6 +95,7 @@ export default function StageScreen() {
     setShooterName('')
     setTime('')
     setSequence([])
+    setCategory('Production')
     setEditingScoreId(null)
   }
 
@@ -99,6 +104,7 @@ export default function StageScreen() {
     setShooterName(item.shooterName)
     setTime(String(item.time))
     setSequence(hitsToSequence(item.hits))
+    setCategory(item.category ?? 'Production')
   }
 
   function handleSave() {
@@ -107,9 +113,9 @@ export default function StageScreen() {
     if (!name || isNaN(t) || t <= 0) return
     const hits = sequenceToHits(sequence)
     if (editingScoreId) {
-      updateScore(id, editingScoreId, { shooterName: name, time: t, hits })
+      updateScore(id, editingScoreId, { shooterName: name, time: t, hits, category })
     } else {
-      addScore(id, { shooterName: name, time: t, hits })
+      addScore(id, { shooterName: name, time: t, hits, category })
     }
     resetForm()
   }
@@ -125,9 +131,15 @@ export default function StageScreen() {
     sequence.length === totalExpected ? '#2ecc71' :
     sequence.length > totalExpected ? '#e63946' : '#888'
 
-  const sorted = [...stage.scores].sort(
-    (a, b) => computeHitFactor(b.hits, b.time) - computeHitFactor(a.hits, a.time)
-  )
+  // Build SectionList sections: one per non-empty category, sorted by HF within each
+  const sections = CATEGORIES.flatMap((cat) => {
+    const catScores = stage.scores
+      .filter((sc) => (sc.category ?? 'Production') === cat)
+      .sort((a, b) => computeHitFactor(b.hits, b.time) - computeHitFactor(a.hits, a.time))
+    return catScores.length > 0 ? [{ title: cat, data: catScores }] : []
+  })
+
+  const totalScores = stage.scores.length
 
   return (
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -156,6 +168,19 @@ export default function StageScreen() {
           />
         </View>
 
+        {/* Category selector */}
+        <View style={s.categoryRow}>
+          {CATEGORIES.map((cat) => (
+            <Pressable
+              key={cat}
+              style={[s.catBtn, category === cat && s.catBtnActive]}
+              onPress={() => setCategory(cat)}
+            >
+              <Text style={[s.catBtnText, category === cat && s.catBtnTextActive]}>{cat}</Text>
+            </Pressable>
+          ))}
+        </View>
+
         <View style={s.hitRow}>
           {HIT_BUTTONS.map(({ key, label, color }) => (
             <Pressable
@@ -177,7 +202,6 @@ export default function StageScreen() {
           <View style={s.tapeMain}>
             {totalExpected != null && stage.numTargets > 0
               ? (() => {
-                  // Build groups with variable per-target sizes
                   const groups: HitKey[][] = []
                   let offset = 0
                   for (let i = 0; i < stage.numTargets; i++) {
@@ -185,7 +209,6 @@ export default function StageScreen() {
                     groups.push(sequence.slice(offset, offset + count))
                     offset += count
                   }
-                  // overflow group for extra hits beyond expected
                   if (sequence.length > totalExpected) {
                     groups.push(sequence.slice(totalExpected))
                   }
@@ -253,15 +276,22 @@ export default function StageScreen() {
       </View>
 
       {/* ── Results (fills remaining space, scrolls internally) ── */}
-      {sorted.length > 0 && (
+      {totalScores > 0 && (
         <View style={s.results}>
           <Text style={s.listHeader}>
-            Results — {sorted.length} shooter{sorted.length !== 1 ? 's' : ''}
+            Results — {totalScores} shooter{totalScores !== 1 ? 's' : ''}
           </Text>
-          <FlatList
-            data={sorted}
+          <SectionList
+            sections={sections}
             keyExtractor={(item) => item.id}
             style={{ flex: 1 }}
+            stickySectionHeadersEnabled={false}
+            renderSectionHeader={({ section }) => (
+              <View style={s.sectionHeader}>
+                <Text style={s.sectionTitle}>{section.title}</Text>
+                <Text style={s.sectionCount}>{section.data.length}</Text>
+              </View>
+            )}
             renderItem={({ item, index }: { item: ShooterScore; index: number }) => {
               const scoreHf = computeHitFactor(item.hits, item.time)
               const pts = computePoints(item.hits)
@@ -308,6 +338,19 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
+
+  categoryRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  catBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  catBtnActive: { borderColor: '#e63946', backgroundColor: '#3a1a1a' },
+  catBtnText: { color: '#555', fontSize: 13, fontWeight: '600' },
+  catBtnTextActive: { color: '#e63946' },
 
   hitRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   hitBtn: {
@@ -392,7 +435,15 @@ const s = StyleSheet.create({
 
   // Results — fills remaining space
   results: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
-  listHeader: { color: '#888', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  listHeader: { color: '#888', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  sectionTitle: { color: '#666', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' },
+  sectionCount: { color: '#555', fontSize: 11 },
   scoreRow: {
     backgroundColor: '#2a2a2a',
     borderRadius: 8,

@@ -1,3 +1,6 @@
+export type Category = 'Open' | 'Standard' | 'Production'
+export const CATEGORIES: Category[] = ['Open', 'Standard', 'Production']
+
 export type Hits = {
   A: number
   C: number
@@ -10,6 +13,7 @@ export type ShooterScore = {
   shooterName: string
   time: number
   hits: Hits
+  category?: Category
 }
 
 export type Stage = {
