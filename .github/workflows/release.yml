@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Required for GitHub Pages deployment and creating releases
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Shared version info ────────────────────────────────────────────────────
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      hash: ${{ steps.v.outputs.hash }}
+      time: ${{ steps.v.outputs.time }}
+    steps:
+      - id: v
+        run: |
+          echo "hash=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          echo "time=$(date -u +'%Y-%m-%d %H:%M UTC')" >> $GITHUB_OUTPUT
+
+  # ── Web → GitHub Pages ─────────────────────────────────────────────────────
+  # NOTE: In repo Settings → Pages, set Source to "GitHub Actions"
+  deploy-web:
+    needs: version
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build web
+        env:
+          EXPO_PUBLIC_COMMIT_HASH: ${{ needs.version.outputs.hash }}
+          EXPO_PUBLIC_BUILD_TIME: ${{ needs.version.outputs.time }}
+          EXPO_BASE_URL: /${{ github.event.repository.name }}/
+        run: npx expo export --platform web
+
+      - uses: actions/configure-pages@v4
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  # ── Android APK ────────────────────────────────────────────────────────────
+  build-android:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prebuild Android native project
+        env:
+          EXPO_PUBLIC_COMMIT_HASH: ${{ needs.version.outputs.hash }}
+          EXPO_PUBLIC_BUILD_TIME: ${{ needs.version.outputs.time }}
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: |
+          mv android/app/build/outputs/apk/debug/app-debug.apk \
+             scorer-${{ needs.version.outputs.hash }}.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ needs.version.outputs.hash }}
+          path: scorer-${{ needs.version.outputs.hash }}.apk
+          retention-days: 30
+
+  # ── GitHub Release ─────────────────────────────────────────────────────────
+  create-release:
+    needs: [version, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-${{ needs.version.outputs.hash }}
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.hash }}
+          name: ${{ needs.version.outputs.hash }}
+          body: |
+            **Commit:** `${{ github.sha }}`
+            **Built:** ${{ needs.version.outputs.time }}
+          files: scorer-${{ needs.version.outputs.hash }}.apk
+          make_latest: true
