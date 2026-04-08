@@ -84,7 +84,7 @@ export default function StageScreen() {
 
   function handleSave() {
     const name = shooterName.trim()
-    const t = parseFloat(time.replace(';', '.'))
+    const t = parseFloat(time.replace(/[; ]/g, '.'))
     if (!name || isNaN(t) || t <= 0) return
     const hits = sequenceToHits(sequence)
     addScore(id, { shooterName: name, time: t, hits })
@@ -93,7 +93,7 @@ export default function StageScreen() {
 
   const hits = sequenceToHits(sequence)
   const points = computePoints(hits)
-  const parsedTime = parseFloat(time.replace(';', '.'))
+  const parsedTime = parseFloat(time.replace(/[; ]/g, '.'))
   const hf = !isNaN(parsedTime) && parsedTime > 0 ? computeHitFactor(hits, parsedTime) : null
   const canSave = shooterName.trim().length > 0 && !isNaN(parsedTime) && parsedTime > 0
 
