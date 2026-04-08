@@ -45,12 +45,14 @@ export default function HomeScreen() {
           </Pressable>
         )}
       />
-      <Pressable style={s.fab} onPress={() => router.push('/stage/new')}>
-        <Text style={s.fabText}>+</Text>
-      </Pressable>
-      <Text style={s.version}>
-        {COMMIT_HASH}{BUILD_TIME ? `  ·  ${BUILD_TIME}` : ''}
-      </Text>
+      <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+        <Pressable style={s.fab} onPress={() => router.push('/stage/new')}>
+          <Text style={s.fabText}>+</Text>
+        </Pressable>
+        <Text style={s.version}>
+          {COMMIT_HASH}{BUILD_TIME ? `  ·  ${BUILD_TIME}` : ''}
+        </Text>
+      </View>
     </View>
   )
 }
