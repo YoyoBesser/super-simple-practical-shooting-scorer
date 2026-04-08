@@ -17,7 +17,21 @@ export type Stage = {
   name: string
   numTargets: number
   shotsPerTarget: number
+  shotsPerTargetList?: number[]   // per-target overrides; length === numTargets when set
   scores: ShooterScore[]
+}
+
+/** Returns shot count for target at index i, honouring per-target list if present. */
+export function getShotsForTarget(stage: Stage, i: number): number {
+  return stage.shotsPerTargetList?.[i] ?? stage.shotsPerTarget
+}
+
+/** Returns total expected shots for the stage. */
+export function totalExpectedShots(stage: Stage): number {
+  if (stage.shotsPerTargetList && stage.shotsPerTargetList.length === stage.numTargets) {
+    return stage.shotsPerTargetList.reduce((a, b) => a + b, 0)
+  }
+  return stage.numTargets * stage.shotsPerTarget
 }
 
 export function computeHitFactor(hits: Hits, time: number): number {

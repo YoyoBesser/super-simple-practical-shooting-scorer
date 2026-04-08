@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
 import { useStore } from '../../store/useStore'
-import { computeHitFactor, computePoints, type Hits, type ShooterScore } from '../../store/types'
+import { computeHitFactor, computePoints, getShotsForTarget, totalExpectedShots, type Hits, type ShooterScore } from '../../store/types'
 
 type HitKey = keyof Hits
 
@@ -75,8 +75,8 @@ export default function StageScreen() {
   }
 
   const totalExpected =
-    Number.isFinite(stage.numTargets) && Number.isFinite(stage.shotsPerTarget)
-      ? stage.numTargets * stage.shotsPerTarget
+    Number.isFinite(stage.numTargets) && Number.isFinite(stage.shotsPerTarget) && stage.numTargets > 0
+      ? totalExpectedShots(stage)
       : null
 
   function addHit(key: HitKey) {
@@ -175,26 +175,31 @@ export default function StageScreen() {
 
         <View style={s.tapeBox}>
           <View style={s.tapeMain}>
-            {totalExpected != null && stage.shotsPerTarget > 0
+            {totalExpected != null && stage.numTargets > 0
               ? (() => {
+                  // Build groups with variable per-target sizes
                   const groups: HitKey[][] = []
+                  let offset = 0
                   for (let i = 0; i < stage.numTargets; i++) {
-                    groups.push(sequence.slice(i * stage.shotsPerTarget, (i + 1) * stage.shotsPerTarget))
+                    const count = getShotsForTarget(stage, i)
+                    groups.push(sequence.slice(offset, offset + count))
+                    offset += count
                   }
-                  // extra overflow group if user tapped beyond expected
+                  // overflow group for extra hits beyond expected
                   if (sequence.length > totalExpected) {
                     groups.push(sequence.slice(totalExpected))
                   }
                   return (
                     <View style={s.groupsRow}>
                       {groups.map((grp, gi) => {
+                        const expected = gi < stage.numTargets ? getShotsForTarget(stage, gi) : 0
                         const borderColor =
                           grp.length === 0 ? '#333' :
-                          grp.length < stage.shotsPerTarget ? '#f39c12' : '#2ecc71'
+                          grp.length < expected ? '#f39c12' : '#2ecc71'
                         return (
                           <View key={gi} style={[s.targetGroup, { borderColor }]}>
                             {grp.length === 0
-                              ? Array.from({ length: stage.shotsPerTarget }).map((_, si) => (
+                              ? Array.from({ length: expected }).map((_, si) => (
                                   <Text key={si} style={s.groupPlaceholder}>·</Text>
                                 ))
                               : grp.map((key, ki) => (

@@ -5,7 +5,7 @@ import type { Stage, ShooterScore } from './types'
 
 type State = {
   stages: Stage[]
-  addStage: (name: string, numTargets: number, shotsPerTarget: number) => string
+  addStage: (name: string, numTargets: number, shotsPerTarget: number, shotsPerTargetList?: number[]) => string
   deleteStage: (id: string) => void
   addScore: (stageId: string, score: Omit<ShooterScore, 'id'>) => void
   deleteScore: (stageId: string, scoreId: string) => void
@@ -21,10 +21,10 @@ export const useStore = create<State>()(
     (set) => ({
       stages: [],
 
-      addStage: (name, numTargets, shotsPerTarget) => {
+      addStage: (name, numTargets, shotsPerTarget, shotsPerTargetList) => {
         const id = uuid()
         set((s) => ({
-          stages: [...s.stages, { id, name, numTargets, shotsPerTarget, scores: [] }],
+          stages: [...s.stages, { id, name, numTargets, shotsPerTarget, shotsPerTargetList, scores: [] }],
         }))
         return id
       },
