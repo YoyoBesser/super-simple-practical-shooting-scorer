@@ -62,7 +62,7 @@ export default function HomeScreen() {
           <Text style={s.fabText}>+</Text>
         </Pressable>
         <Text style={s.version}>
-          {COMMIT_HASH}{BUILD_TIME ? `  ·  ${BUILD_TIME}` : ''}
+          {COMMIT_HASH}{BUILD_TIME ? `  ·  ${new Date(BUILD_TIME).toLocaleString('en-GB', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
         </Text>
       </View>
     </View>

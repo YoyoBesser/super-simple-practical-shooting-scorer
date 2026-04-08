@@ -4,10 +4,12 @@ import {
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native'
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
+import { captureRef } from 'react-native-view-shot'
+import * as Sharing from 'expo-sharing'
 import { useStore } from '../../store/useStore'
 import {
   computeHitFactor, computePoints, getShotsForTarget, totalExpectedShots,
-  type Hits, type ShooterScore, type Category, CATEGORIES,
+  type Hits, type ShooterScore, type Stage, type Category, CATEGORIES,
 } from '../../store/types'
 
 type HitKey = keyof Hits
@@ -42,6 +44,91 @@ function hitsToSequence(hits: Hits): HitKey[] {
   ]
 }
 
+function jerusalemTimestamp(): string {
+  return new Date().toLocaleString('en-GB', {
+    timeZone: 'Asia/Jerusalem',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+// ── Export ticker (used inside ExportView) ────────────────────────────────────
+function ExportTicker({ stage, sequence }: { stage: Stage; sequence: HitKey[] }) {
+  const groups: HitKey[][] = []
+  let offset = 0
+  for (let i = 0; i < stage.numTargets; i++) {
+    const count = getShotsForTarget(stage, i)
+    groups.push(sequence.slice(offset, offset + count))
+    offset += count
+  }
+  return (
+    <View style={es.tickerRow}>
+      {groups.map((grp, gi) => {
+        const expected = getShotsForTarget(stage, gi)
+        const borderColor = grp.length === 0 ? '#333' : grp.length < expected ? '#f39c12' : '#2ecc71'
+        return (
+          <View key={gi} style={[es.tickerGroup, { borderColor }]}>
+            {grp.length === 0
+              ? Array.from({ length: expected }).map((_, si) => (
+                  <Text key={si} style={es.tickerPlaceholder}>·</Text>
+                ))
+              : grp.map((key, ki) => (
+                  <Text key={ki} style={[es.tickerLetter, { color: HIT_COLOR[key] }]}>
+                    {key === 'NSM' ? 'M' : key}
+                  </Text>
+                ))
+            }
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
+// ── Export view (rendered off-screen, captured as PNG) ────────────────────────
+function ExportView({
+  stage,
+  sections,
+  timestamp,
+}: {
+  stage: Stage
+  sections: { title: string; data: ShooterScore[] }[]
+  timestamp: string
+}) {
+  const hasTargets = stage.numTargets > 0 && stage.shotsPerTarget > 0
+  return (
+    <View style={es.root}>
+      <Text style={es.title}>{stage.name}</Text>
+      <Text style={es.subtitle}>Leaderboard · {timestamp}</Text>
+
+      {sections.map(({ title, data }) => (
+        <View key={title} style={es.section}>
+          <Text style={es.catHeader}>{title}</Text>
+          {data.map((item, index) => {
+            const scoreHf = computeHitFactor(item.hits, item.time)
+            const pts = computePoints(item.hits)
+            const seq = hitsToSequence(item.hits)
+            return (
+              <View key={item.id} style={es.row}>
+                <Text style={es.rowRank}>#{index + 1}</Text>
+                <View style={es.rowBody}>
+                  <Text style={es.rowName}>{item.shooterName}</Text>
+                  {hasTargets && <ExportTicker stage={stage} sequence={seq} />}
+                  <Text style={es.rowDetail}>
+                    {item.time.toFixed(2)}s · {pts}pts · A{item.hits.A} C{item.hits.C} D{item.hits.D} M{item.hits.NSM}
+                  </Text>
+                </View>
+                <Text style={es.rowHf}>{scoreHf.toFixed(2)}</Text>
+              </View>
+            )
+          })}
+        </View>
+      ))}
+    </View>
+  )
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
 export default function StageScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const navigation = useNavigation()
@@ -57,6 +144,7 @@ export default function StageScreen() {
   const [category, setCategory] = useState<Category>('Production')
   const [editingScoreId, setEditingScoreId] = useState<string | null>(null)
   const timeRef = useRef<TextInput>(null)
+  const exportRef = useRef<View>(null)
 
   useEffect(() => {
     if (!stage) return
@@ -120,6 +208,25 @@ export default function StageScreen() {
     resetForm()
   }
 
+  async function handleExport() {
+    if (!stage) return
+    try {
+      const uri = await captureRef(exportRef, { format: 'png', quality: 1 })
+      if (Platform.OS === 'web') {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = `${stage.name.replace(/[^a-z0-9]/gi, '-')}-leaderboard.png`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } else {
+        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Export Leaderboard' })
+      }
+    } catch (e) {
+      console.error('Export failed', e)
+    }
+  }
+
   const hits = sequenceToHits(sequence)
   const points = computePoints(hits)
   const parsedTime = parseFloat(time.replace(/[; ]/g, '.'))
@@ -131,7 +238,6 @@ export default function StageScreen() {
     sequence.length === totalExpected ? '#2ecc71' :
     sequence.length > totalExpected ? '#e63946' : '#888'
 
-  // Build SectionList sections: one per non-empty category, sorted by HF within each
   const sections = CATEGORIES.flatMap((cat) => {
     const catScores = stage.scores
       .filter((sc) => (sc.category ?? 'Production') === cat)
@@ -168,7 +274,6 @@ export default function StageScreen() {
           />
         </View>
 
-        {/* Category selector */}
         <View style={s.categoryRow}>
           {CATEGORIES.map((cat) => (
             <Pressable
@@ -278,9 +383,14 @@ export default function StageScreen() {
       {/* ── Results (fills remaining space, columns side by side) ── */}
       {totalScores > 0 && (
         <View style={s.results}>
-          <Text style={s.listHeader}>
-            Results — {totalScores} shooter{totalScores !== 1 ? 's' : ''}
-          </Text>
+          <View style={s.resultsHeader}>
+            <Text style={s.listHeader}>
+              Results — {totalScores} shooter{totalScores !== 1 ? 's' : ''}
+            </Text>
+            <Pressable style={s.exportBtn} onPress={handleExport}>
+              <Text style={s.exportBtnText}>Export PNG</Text>
+            </Pressable>
+          </View>
           <View style={s.columnsRow}>
             {sections.map(({ title, data }) => (
               <View key={title} style={s.column}>
@@ -321,16 +431,31 @@ export default function StageScreen() {
         </View>
       )}
 
+      {/* Off-screen export view — always rendered when there are scores */}
+      {totalScores > 0 && (
+        <View
+          ref={exportRef}
+          collapsable={false}
+          style={{ position: 'absolute', left: -2000, top: 0 }}
+        >
+          <ExportView
+            stage={stage}
+            sections={sections}
+            timestamp={jerusalemTimestamp()}
+          />
+        </View>
+      )}
+
     </KeyboardAvoidingView>
   )
 }
 
+// ── Entry panel styles ────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: { color: '#666', fontSize: 16 },
 
-  // Entry panel — never scrolls, fixed at top
   panel: { padding: 16, paddingBottom: 0 },
 
   inputRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
@@ -376,11 +501,7 @@ const s = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
   },
-  tapeMain: {
-    flex: 1,
-    padding: 10,
-    justifyContent: 'space-between',
-  },
+  tapeMain: { flex: 1, padding: 10, justifyContent: 'space-between' },
   tapeLetters: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -391,12 +512,7 @@ const s = StyleSheet.create({
   tapePlaceholder: { color: '#444', fontSize: 13 },
   tapeLetter: { fontSize: 20, fontWeight: '800', lineHeight: 24 },
   counter: { fontSize: 17, fontWeight: '700' },
-  groupsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 6,
-  },
+  groupsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
   targetGroup: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -437,9 +553,18 @@ const s = StyleSheet.create({
   },
   cancelBtnText: { color: '#aaa', fontSize: 16, fontWeight: '600' },
 
-  // Results — fills remaining space
   results: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
-  listHeader: { color: '#888', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  resultsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  listHeader: { color: '#888', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  exportBtn: {
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  exportBtnText: { color: '#888', fontSize: 12, fontWeight: '600' },
+
   columnsRow: { flex: 1, flexDirection: 'row', gap: 8 },
   column: { flex: 1 },
   sectionHeader: {
@@ -460,10 +585,7 @@ const s = StyleSheet.create({
     gap: 10,
     marginBottom: 6,
   },
-  scoreRowEditing: {
-    borderWidth: 1,
-    borderColor: '#e63946',
-  },
+  scoreRowEditing: { borderWidth: 1, borderColor: '#e63946' },
   rank: { color: '#555', fontSize: 13, width: 22 },
   scoreName: { color: '#fff', fontSize: 15, fontWeight: '600' },
   scoreDetail: { color: '#888', fontSize: 11, marginTop: 2 },
@@ -472,4 +594,52 @@ const s = StyleSheet.create({
 
   backBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   backBtnText: { color: '#fff', fontSize: 17 },
+})
+
+// ── Export view styles ────────────────────────────────────────────────────────
+const es = StyleSheet.create({
+  root: {
+    backgroundColor: '#1a1a1a',
+    padding: 28,
+    width: 520,
+  },
+  title: { color: '#fff', fontSize: 24, fontWeight: '800', marginBottom: 4 },
+  subtitle: { color: '#555', fontSize: 12, marginBottom: 24 },
+  section: { marginBottom: 20 },
+  catHeader: {
+    color: '#e63946',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 8,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+  },
+  rowRank: { color: '#555', fontSize: 13, width: 26, paddingTop: 2 },
+  rowBody: { flex: 1 },
+  rowName: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  rowDetail: { color: '#888', fontSize: 11, marginTop: 3 },
+  rowHf: { color: '#e63946', fontSize: 22, fontWeight: '800' },
+  tickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  tickerGroup: {
+    flexDirection: 'row',
+    gap: 2,
+    borderWidth: 1.5,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  tickerLetter: { fontSize: 13, fontWeight: '800', lineHeight: 17 },
+  tickerPlaceholder: { color: '#444', fontSize: 13, lineHeight: 17 },
 })
