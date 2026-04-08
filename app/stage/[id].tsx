@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, Pressable, StyleSheet,
-  KeyboardAvoidingView, Platform, SectionList,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native'
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
 import { useStore } from '../../store/useStore'
@@ -275,45 +275,49 @@ export default function StageScreen() {
         </View>
       </View>
 
-      {/* ── Results (fills remaining space, scrolls internally) ── */}
+      {/* ── Results (fills remaining space, columns side by side) ── */}
       {totalScores > 0 && (
         <View style={s.results}>
           <Text style={s.listHeader}>
             Results — {totalScores} shooter{totalScores !== 1 ? 's' : ''}
           </Text>
-          <SectionList
-            sections={sections}
-            keyExtractor={(item) => item.id}
-            style={{ flex: 1 }}
-            stickySectionHeadersEnabled={false}
-            renderSectionHeader={({ section }) => (
-              <View style={s.sectionHeader}>
-                <Text style={s.sectionTitle}>{section.title}</Text>
-                <Text style={s.sectionCount}>{section.data.length}</Text>
+          <View style={s.columnsRow}>
+            {sections.map(({ title, data }) => (
+              <View key={title} style={s.column}>
+                <View style={s.sectionHeader}>
+                  <Text style={s.sectionTitle}>{title}</Text>
+                  <Text style={s.sectionCount}>{data.length}</Text>
+                </View>
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {data.map((item, index) => {
+                    const scoreHf = computeHitFactor(item.hits, item.time)
+                    const pts = computePoints(item.hits)
+                    return (
+                      <Pressable
+                        key={item.id}
+                        style={[s.scoreRow, editingScoreId === item.id && s.scoreRowEditing]}
+                        onPress={() => loadForEdit(item)}
+                        onLongPress={() => deleteScore(id, item.id)}
+                      >
+                        <Text style={s.rank}>#{index + 1}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.scoreName}>{item.shooterName}</Text>
+                          <Text style={s.scoreDetail}>
+                            {item.time.toFixed(2)}s · {pts}pts
+                          </Text>
+                          <Text style={s.scoreDetail}>
+                            A{item.hits.A} C{item.hits.C} D{item.hits.D} M{item.hits.NSM}
+                          </Text>
+                        </View>
+                        <Text style={s.hfValue}>{scoreHf.toFixed(2)}</Text>
+                      </Pressable>
+                    )
+                  })}
+                  <Text style={s.listHint}>Tap · Long-press del</Text>
+                </ScrollView>
               </View>
-            )}
-            renderItem={({ item, index }: { item: ShooterScore; index: number }) => {
-              const scoreHf = computeHitFactor(item.hits, item.time)
-              const pts = computePoints(item.hits)
-              return (
-                <Pressable
-                  style={[s.scoreRow, editingScoreId === item.id && s.scoreRowEditing]}
-                  onPress={() => loadForEdit(item)}
-                  onLongPress={() => deleteScore(id, item.id)}
-                >
-                  <Text style={s.rank}>#{index + 1}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.scoreName}>{item.shooterName}</Text>
-                    <Text style={s.scoreDetail}>
-                      {item.time.toFixed(2)}s · {pts} pts · A{item.hits.A} C{item.hits.C} D{item.hits.D} M{item.hits.NSM}
-                    </Text>
-                  </View>
-                  <Text style={s.hfValue}>{scoreHf.toFixed(2)}</Text>
-                </Pressable>
-              )
-            }}
-            ListFooterComponent={<Text style={s.listHint}>Tap to edit · Long-press to delete</Text>}
-          />
+            ))}
+          </View>
         </View>
       )}
 
@@ -436,11 +440,14 @@ const s = StyleSheet.create({
   // Results — fills remaining space
   results: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
   listHeader: { color: '#888', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  columnsRow: { flex: 1, flexDirection: 'row', gap: 8 },
+  column: { flex: 1 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 4,
+    marginBottom: 4,
   },
   sectionTitle: { color: '#666', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' },
   sectionCount: { color: '#555', fontSize: 11 },
