@@ -210,7 +210,9 @@ export default function StageScreen() {
 
   async function handleExport() {
     if (!stage) return
-    const filename = `${stage.name.replace(/[^a-z0-9]/gi, '-')}-leaderboard.png`
+    const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }).replace(/-/g, '')
+    const slug = stage.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    const filename = `${date}-${slug}.png`
     try {
       if (Platform.OS === 'web') {
         const { toPng } = await import('html-to-image')
