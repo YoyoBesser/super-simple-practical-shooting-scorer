@@ -4,7 +4,7 @@ import {
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native'
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
-import { captureRef } from 'react-native-view-shot'
+import { captureRef } from '../../utils/captureRef'
 import * as Sharing from 'expo-sharing'
 import { useStore } from '../../store/useStore'
 import {
