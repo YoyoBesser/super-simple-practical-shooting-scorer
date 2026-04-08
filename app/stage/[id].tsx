@@ -471,6 +471,7 @@ const s = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 11,
+    minWidth: 0, // prevents HTML input's intrinsic size from overriding flex layout on web
   },
 
   categoryRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
