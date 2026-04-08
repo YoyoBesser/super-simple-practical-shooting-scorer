@@ -63,7 +63,10 @@ export default function StageScreen() {
     )
   }
 
-  const totalExpected = stage.numTargets * stage.shotsPerTarget
+  const totalExpected =
+    Number.isFinite(stage.numTargets) && Number.isFinite(stage.shotsPerTarget)
+      ? stage.numTargets * stage.shotsPerTarget
+      : null
 
   function addHit(key: HitKey) {
     setSequence((seq) => [...seq, key])
@@ -95,6 +98,7 @@ export default function StageScreen() {
   const canSave = shooterName.trim().length > 0 && !isNaN(parsedTime) && parsedTime > 0
 
   const counterColor =
+    totalExpected == null ? '#888' :
     sequence.length === totalExpected ? '#2ecc71' :
     sequence.length > totalExpected ? '#e63946' : '#888'
 
@@ -159,7 +163,7 @@ export default function StageScreen() {
               }
             </View>
             <Text style={[s.counter, { color: counterColor }]}>
-              {sequence.length} / {totalExpected}
+              {sequence.length}{totalExpected != null ? ` / ${totalExpected}` : ''}
             </Text>
           </View>
           <Pressable
@@ -276,7 +280,7 @@ const s = StyleSheet.create({
     backgroundColor: '#3a3a3a',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    width: 64,
   },
   backspaceBtnDisabled: { opacity: 0.3 },
   backspaceBtnText: { color: '#fff', fontSize: 22 },
