@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <!-- maximum-scale=1 / user-scalable=no: prevent pinch-zoom showing white borders -->
+    <!-- viewport-fit=cover: fill notched/rounded-corner screens edge-to-edge -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>%WEB_TITLE%</title>
+    <style id="expo-reset">
+      /* Full-height root */
+      html,
+      body {
+        height: 100%;
+      }
+      /* position:fixed prevents the browser from scrolling the page to bring a
+         focused <input> into view, which causes the layout to "jump" on mobile. */
+      body {
+        overflow: hidden;
+        position: fixed;
+        width: 100%;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
