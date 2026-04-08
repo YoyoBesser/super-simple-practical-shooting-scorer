@@ -175,16 +175,53 @@ export default function StageScreen() {
 
         <View style={s.tapeBox}>
           <View style={s.tapeMain}>
-            <View style={s.tapeLetters}>
-              {sequence.length === 0
-                ? <Text style={s.tapePlaceholder}>tap buttons to record hits…</Text>
-                : sequence.map((key, i) => (
-                    <Text key={i} style={[s.tapeLetter, { color: HIT_COLOR[key] }]}>
-                      {key === 'NSM' ? 'M' : key}
-                    </Text>
-                  ))
-              }
-            </View>
+            {totalExpected != null && stage.shotsPerTarget > 0
+              ? (() => {
+                  const groups: HitKey[][] = []
+                  for (let i = 0; i < stage.numTargets; i++) {
+                    groups.push(sequence.slice(i * stage.shotsPerTarget, (i + 1) * stage.shotsPerTarget))
+                  }
+                  // extra overflow group if user tapped beyond expected
+                  if (sequence.length > totalExpected) {
+                    groups.push(sequence.slice(totalExpected))
+                  }
+                  return (
+                    <View style={s.groupsRow}>
+                      {groups.map((grp, gi) => {
+                        const borderColor =
+                          grp.length === 0 ? '#333' :
+                          grp.length < stage.shotsPerTarget ? '#f39c12' : '#2ecc71'
+                        return (
+                          <View key={gi} style={[s.targetGroup, { borderColor }]}>
+                            {grp.length === 0
+                              ? Array.from({ length: stage.shotsPerTarget }).map((_, si) => (
+                                  <Text key={si} style={s.groupPlaceholder}>·</Text>
+                                ))
+                              : grp.map((key, ki) => (
+                                  <Text key={ki} style={[s.tapeLetter, { color: HIT_COLOR[key] }]}>
+                                    {key === 'NSM' ? 'M' : key}
+                                  </Text>
+                                ))
+                            }
+                          </View>
+                        )
+                      })}
+                    </View>
+                  )
+                })()
+              : (
+                <View style={s.tapeLetters}>
+                  {sequence.length === 0
+                    ? <Text style={s.tapePlaceholder}>tap buttons to record hits…</Text>
+                    : sequence.map((key, i) => (
+                        <Text key={i} style={[s.tapeLetter, { color: HIT_COLOR[key] }]}>
+                          {key === 'NSM' ? 'M' : key}
+                        </Text>
+                      ))
+                  }
+                </View>
+              )
+            }
             <Text style={[s.counter, { color: counterColor }]}>
               {sequence.length}{totalExpected != null ? ` / ${totalExpected}` : ''}
             </Text>
@@ -302,6 +339,23 @@ const s = StyleSheet.create({
   tapePlaceholder: { color: '#444', fontSize: 13 },
   tapeLetter: { fontSize: 20, fontWeight: '800', lineHeight: 24 },
   counter: { fontSize: 17, fontWeight: '700' },
+  groupsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+  },
+  targetGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+    borderWidth: 1.5,
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    minWidth: 28,
+  },
+  groupPlaceholder: { color: '#444', fontSize: 18, lineHeight: 24 },
   backspaceBtn: {
     backgroundColor: '#3a3a3a',
     justifyContent: 'center',
