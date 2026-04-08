@@ -210,16 +210,19 @@ export default function StageScreen() {
 
   async function handleExport() {
     if (!stage) return
+    const filename = `${stage.name.replace(/[^a-z0-9]/gi, '-')}-leaderboard.png`
     try {
-      const uri = await captureRef(exportRef, { format: 'png', quality: 1 })
       if (Platform.OS === 'web') {
+        const { toPng } = await import('html-to-image')
+        const dataUrl = await toPng(exportRef.current as unknown as HTMLElement)
         const link = document.createElement('a')
-        link.href = uri
-        link.download = `${stage.name.replace(/[^a-z0-9]/gi, '-')}-leaderboard.png`
+        link.href = dataUrl
+        link.download = filename
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
       } else {
+        const uri = await captureRef(exportRef, { format: 'png', quality: 1 })
         await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Export Leaderboard' })
       }
     } catch (e) {
