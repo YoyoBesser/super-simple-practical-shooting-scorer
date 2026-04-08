@@ -9,6 +9,7 @@ type State = {
   deleteStage: (id: string) => void
   addScore: (stageId: string, score: Omit<ShooterScore, 'id'>) => void
   deleteScore: (stageId: string, scoreId: string) => void
+  updateScore: (stageId: string, scoreId: string, score: Omit<ShooterScore, 'id'>) => void
 }
 
 function uuid(): string {
@@ -45,6 +46,20 @@ export const useStore = create<State>()(
           stages: s.stages.map((st) =>
             st.id === stageId
               ? { ...st, scores: st.scores.filter((sc) => sc.id !== scoreId) }
+              : st
+          ),
+        })),
+
+      updateScore: (stageId, scoreId, score) =>
+        set((s) => ({
+          stages: s.stages.map((st) =>
+            st.id === stageId
+              ? {
+                  ...st,
+                  scores: st.scores.map((sc) =>
+                    sc.id === scoreId ? { ...score, id: scoreId } : sc
+                  ),
+                }
               : st
           ),
         })),

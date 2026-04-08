@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, Pressable, StyleSheet,
-  KeyboardAvoidingView, Platform, Alert, FlatList,
+  KeyboardAvoidingView, Platform, FlatList,
 } from 'react-native'
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
 import { useStore } from '../../store/useStore'
@@ -30,17 +30,28 @@ function sequenceToHits(seq: HitKey[]): Hits {
   )
 }
 
+function hitsToSequence(hits: Hits): HitKey[] {
+  return [
+    ...Array(hits.A).fill('A' as HitKey),
+    ...Array(hits.C).fill('C' as HitKey),
+    ...Array(hits.D).fill('D' as HitKey),
+    ...Array(hits.NSM).fill('NSM' as HitKey),
+  ]
+}
+
 export default function StageScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const navigation = useNavigation()
   const stage = useStore((s) => s.stages.find((st) => st.id === id))
   const addScore = useStore((s) => s.addScore)
   const deleteScore = useStore((s) => s.deleteScore)
+  const updateScore = useStore((s) => s.updateScore)
 
   const router = useRouter()
   const [shooterName, setShooterName] = useState('')
   const [time, setTime] = useState('')
   const [sequence, setSequence] = useState<HitKey[]>([])
+  const [editingScoreId, setEditingScoreId] = useState<string | null>(null)
   const timeRef = useRef<TextInput>(null)
 
   useEffect(() => {
@@ -80,6 +91,14 @@ export default function StageScreen() {
     setShooterName('')
     setTime('')
     setSequence([])
+    setEditingScoreId(null)
+  }
+
+  function loadForEdit(item: ShooterScore) {
+    setEditingScoreId(item.id)
+    setShooterName(item.shooterName)
+    setTime(String(item.time))
+    setSequence(hitsToSequence(item.hits))
   }
 
   function handleSave() {
@@ -87,7 +106,11 @@ export default function StageScreen() {
     const t = parseFloat(time.replace(/[; ]/g, '.'))
     if (!name || isNaN(t) || t <= 0) return
     const hits = sequenceToHits(sequence)
-    addScore(id, { shooterName: name, time: t, hits })
+    if (editingScoreId) {
+      updateScore(id, editingScoreId, { shooterName: name, time: t, hits })
+    } else {
+      addScore(id, { shooterName: name, time: t, hits })
+    }
     resetForm()
   }
 
@@ -175,9 +198,16 @@ export default function StageScreen() {
           </Pressable>
         </View>
 
-        <Pressable style={[s.saveBtn, !canSave && s.saveBtnDisabled]} onPress={handleSave} disabled={!canSave}>
-          <Text style={s.saveBtnText}>Save Score</Text>
-        </Pressable>
+        <View style={s.saveRow}>
+          {editingScoreId && (
+            <Pressable style={s.cancelBtn} onPress={resetForm}>
+              <Text style={s.cancelBtnText}>Cancel</Text>
+            </Pressable>
+          )}
+          <Pressable style={[s.saveBtn, !canSave && s.saveBtnDisabled, editingScoreId ? { flex: 1 } : {}]} onPress={handleSave} disabled={!canSave}>
+            <Text style={s.saveBtnText}>{editingScoreId ? 'Update Score' : 'Save Score'}</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* ── Results (fills remaining space, scrolls internally) ── */}
@@ -195,13 +225,9 @@ export default function StageScreen() {
               const pts = computePoints(item.hits)
               return (
                 <Pressable
-                  style={s.scoreRow}
-                  onLongPress={() =>
-                    Alert.alert('Delete Score', `Remove ${item.shooterName}'s score?`, [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', style: 'destructive', onPress: () => deleteScore(id, item.id) },
-                    ])
-                  }
+                  style={[s.scoreRow, editingScoreId === item.id && s.scoreRowEditing]}
+                  onPress={() => loadForEdit(item)}
+                  onLongPress={() => deleteScore(id, item.id)}
                 >
                   <Text style={s.rank}>#{index + 1}</Text>
                   <View style={{ flex: 1 }}>
@@ -214,7 +240,7 @@ export default function StageScreen() {
                 </Pressable>
               )
             }}
-            ListFooterComponent={<Text style={s.listHint}>Long-press a result to delete it</Text>}
+            ListFooterComponent={<Text style={s.listHint}>Tap to edit · Long-press to delete</Text>}
           />
         </View>
       )}
@@ -285,15 +311,25 @@ const s = StyleSheet.create({
   backspaceBtnDisabled: { opacity: 0.3 },
   backspaceBtnText: { color: '#fff', fontSize: 22 },
 
+  saveRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   saveBtn: {
+    flex: 1,
     backgroundColor: '#e63946',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
-    marginBottom: 12,
   },
   saveBtnDisabled: { backgroundColor: '#444' },
   saveBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  cancelBtn: {
+    backgroundColor: '#3a3a3a',
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: { color: '#aaa', fontSize: 16, fontWeight: '600' },
 
   // Results — fills remaining space
   results: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
@@ -306,6 +342,10 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     marginBottom: 6,
+  },
+  scoreRowEditing: {
+    borderWidth: 1,
+    borderColor: '#e63946',
   },
   rank: { color: '#555', fontSize: 13, width: 22 },
   scoreName: { color: '#fff', fontSize: 15, fontWeight: '600' },

@@ -1,6 +1,6 @@
 # Feature TODO
 
-## Task 1 — Delete button on stages list
+## ✅ Task 1 — Delete button on stages list
 `app/index.tsx`: Split each row into a navigate Pressable (flex:1) + a red ✕ Pressable on the right.
 
 ## Task 2 — Tap shooter name to edit score
