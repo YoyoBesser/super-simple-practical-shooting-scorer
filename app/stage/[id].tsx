@@ -216,7 +216,9 @@ export default function StageScreen() {
     try {
       if (Platform.OS === 'web') {
         const { toPng } = await import('html-to-image')
-        const dataUrl = await toPng(exportRef.current as unknown as HTMLElement)
+        const dataUrl = await toPng(exportRef.current as unknown as HTMLElement, {
+          style: { position: 'static', left: '0', top: '0' },
+        })
         const link = document.createElement('a')
         link.href = dataUrl
         link.download = filename

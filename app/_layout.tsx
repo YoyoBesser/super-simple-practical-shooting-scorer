@@ -13,7 +13,6 @@ export default function RootLayout() {
     // which causes the layout to "jump" on mobile when the keyboard appears
     document.body.style.position = 'fixed'
     document.body.style.width = '100%'
-    document.body.style.overflow = 'hidden'
     // Tighten viewport: prevent pinch-zoom, fill notched screens
     const vp = document.querySelector('meta[name="viewport"]')
     if (vp) vp.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover')
