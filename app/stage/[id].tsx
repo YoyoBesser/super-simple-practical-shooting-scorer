@@ -101,6 +101,26 @@ function ExportView({
       <Text style={es.title}>{stage.name}</Text>
       <Text style={es.subtitle}>Leaderboard · {timestamp}</Text>
 
+      {/* ── Podium boxes — one per non-empty category ── */}
+      <View style={es.podiumRow}>
+        {sections.map(({ title, data }) => {
+          const winner = data[0]
+          const runnerUp = data[1]
+          return (
+            <View key={title} style={[es.podiumBox, { flex: 1 }]}>
+              <Text style={es.podiumCat}>{title}</Text>
+              <Text style={es.podiumWinner} numberOfLines={2}>{winner.shooterName}</Text>
+              <Text style={es.podiumWinnerHf}>{computeHitFactor(winner.hits, winner.time).toFixed(2)}</Text>
+              {runnerUp && (
+                <Text style={es.podiumRunnerUp} numberOfLines={1}>
+                  2. {runnerUp.shooterName}
+                </Text>
+              )}
+            </View>
+          )
+        })}
+      </View>
+
       {sections.map(({ title, data }) => (
         <View key={title} style={es.section}>
           <Text style={es.catHeader}>{title}</Text>
@@ -612,7 +632,27 @@ const es = StyleSheet.create({
     width: 520,
   },
   title: { color: '#fff', fontSize: 24, fontWeight: '800', marginBottom: 4 },
-  subtitle: { color: '#555', fontSize: 12, marginBottom: 24 },
+  subtitle: { color: '#555', fontSize: 12, marginBottom: 20 },
+
+  podiumRow: { flexDirection: 'row', gap: 10, marginBottom: 28 },
+  podiumBox: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 10,
+    padding: 14,
+    justifyContent: 'center',
+  },
+  podiumCat: {
+    color: '#e63946',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+  },
+  podiumWinner: { color: '#fff', fontSize: 22, fontWeight: '800', lineHeight: 26, marginBottom: 2 },
+  podiumWinnerHf: { color: '#e63946', fontSize: 28, fontWeight: '900', marginBottom: 8 },
+  podiumRunnerUp: { color: '#666', fontSize: 13, fontWeight: '600' },
+
   section: { marginBottom: 20 },
   catHeader: {
     color: '#e63946',
